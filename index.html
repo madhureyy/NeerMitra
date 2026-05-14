@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeerMitra | Water-Borne Disease Early Warning System</title>
+    <meta name="description"
+        content="Predicting waterborne disease outbreaks before they happen in vulnerable regions globally using AI and IoT.">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <!-- AOS CSS -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        navy: '#0B1120',
+                        navy_light: '#111827',
+                        teal: '#00F0FF',
+                        teal_dark: '#00B8D9',
+                        accent: '#FF3366',
+                        text_primary: '#F3F4F6',
+                        text_secondary: '#9CA3AF'
+                    },
+                    animation: {
+                        'blob': 'blob 7s infinite',
+                        'ripple': 'ripple 3s linear infinite',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        },
+                        ripple: {
+                            '0%': { transform: 'scale(0.8)', opacity: '1' },
+                            '100%': { transform: 'scale(2.5)', opacity: '0' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0B1120;
+            color: #F3F4F6;
+            overflow-x: hidden;
+        }
+
+        .glass-card {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .text-gradient {
+            background: linear-gradient(to right, #00F0FF, #00B8D9);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .glow {
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+        }
+
+        .pulse-marker {
+            position: relative;
+            display: inline-flex;
+        }
+
+        .pulse-marker::before,
+        .pulse-marker::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .pulse-marker::before {
+            width: 10px;
+            height: 10px;
+            background-color: #FF3366;
+            z-index: 2;
+        }
+
+        .pulse-marker::after {
+            width: 10px;
+            height: 10px;
+            background-color: #FF3366;
+            animation: ripple 2s infinite ease-out;
+            z-index: 1;
+        }
+
+        .pulse-yellow::before {
+            background-color: #FBBF24;
+        }
+
+        .pulse-yellow::after {
+            background-color: #FBBF24;
+        }
+    </style>
+</head>
+
+<body class="antialiased selection:bg-teal selection:text-navy font-sans relative">
+
+    <!-- Background Elements -->
+    <div class="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+        <div
+            class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-teal/20 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob">
+        </div>
+        <div class="absolute top-[20%] right-[-10%] w-96 h-96 bg-blue-600/20 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-2000"
+            style="animation-delay: 2s;"></div>
+        <div class="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-purple-600/20 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-4000"
+            style="animation-delay: 4s;"></div>
+        <div
+            class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-50">
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 glass-card border-b-0 border-white/5 transition-all duration-300" id="navbar">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <div class="flex-shrink-0 flex items-center gap-3">
+                    <svg class="w-8 h-8 text-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <span class="font-bold text-2xl tracking-tight">Neer<span class="text-teal">Mitra</span></span>
+                </div>
+                <div class="hidden md:flex space-x-8 items-center">
+                    <a href="#problem"
+                        class="text-sm font-medium text-text_secondary hover:text-white transition-colors">The
+                        Problem</a>
+                    <a href="#how-it-works"
+                        class="text-sm font-medium text-text_secondary hover:text-white transition-colors">How It
+                        Works</a>
+                    <a href="#dashboard"
+                        class="text-sm font-medium text-text_secondary hover:text-white transition-colors">Dashboard</a>
+                    <a href="#impact"
+                        class="text-sm font-medium text-text_secondary hover:text-white transition-colors">Impact</a>
+                    <a href="#dashboard"
+                        class="px-5 py-2.5 rounded-full bg-teal/10 border border-teal text-teal hover:bg-teal hover:text-navy transition-all font-semibold text-sm glow">Live
+                        Alert Map</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="relative min-h-screen flex items-center pt-20 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <div data-aos="fade-up" data-aos-duration="1000">
+                    <div
+                        class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-navy_light border border-white/10 mb-6">
+                        <span class="w-2 h-2 rounded-full bg-accent animate-pulse"></span>
+                        <span class="text-xs font-semibold tracking-wider text-text_secondary uppercase">SIH 2025
+                            Initiative</span>
+                    </div>
+                    <h1 class="text-5xl md:text-7xl font-extrabold leading-tight mb-6">
+                        Predicting outbreaks <br />
+                        <span class="text-gradient">before they happen.</span>
+                    </h1>
+                    <p class="text-xl md:text-2xl text-text_secondary mb-8 max-w-2xl leading-relaxed">
+                        An AI + IoT powered early warning system protecting rural communities globally
+                        from waterborne diseases.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <a href="#dashboard"
+                            class="px-8 py-4 rounded-full bg-teal text-navy font-bold text-lg hover:bg-white transition-colors text-center shadow-[0_0_20px_rgba(0,240,255,0.4)]">
+                            View Live Dashboard
+                        </a>
+                        <a href="#how-it-works"
+                            class="px-8 py-4 rounded-full bg-transparent border border-white/20 text-white font-bold text-lg hover:bg-white/5 transition-colors text-center flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                            Read the Research
+                        </a>
+                    </div>
+                </div>
+                <div class="relative hidden lg:block h-[600px]" data-aos="fade-left" data-aos-duration="1200"
+                    data-aos-delay="200">
+                    <!-- Abstract visualization of data/water -->
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <div
+                            class="w-[500px] h-[500px] border border-white/10 rounded-full flex items-center justify-center animate-[spin_60s_linear_infinite]">
+                            <div
+                                class="w-[400px] h-[400px] border border-teal/30 rounded-full flex items-center justify-center animate-[spin_40s_linear_infinite_reverse]">
+                                <div
+                                    class="w-[300px] h-[300px] bg-teal/5 rounded-full backdrop-blur-md border border-teal/50 flex items-center justify-center shadow-[0_0_50px_rgba(0,240,255,0.2)]">
+                                    <svg class="w-32 h-32 text-teal opacity-80" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z">
+                                        </path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Floating data points -->
+                    <div class="absolute top-1/4 right-1/4 glass-card p-4 rounded-xl border border-white/10 animate-bounce"
+                        style="animation-duration: 3s;">
+                        <div class="text-xs text-text_secondary mb-1">Turbidity Level</div>
+                        <div class="text-xl font-bold text-white">4.2 NTU <span
+                                class="text-teal text-sm ml-2">Safe</span></div>
+                    </div>
+                    <div class="absolute bottom-1/3 left-10 glass-card p-4 rounded-xl border border-white/10 animate-bounce"
+                        style="animation-duration: 4s; animation-delay: 1s;">
+                        <div class="text-xs text-text_secondary mb-1">E. coli Risk</div>
+                        <div class="text-xl font-bold text-accent">High Risk <span
+                                class="text-xs text-text_secondary ml-2">89% prob</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scroll indicator -->
+        <div class="absolute bottom-10 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce">
+            <span class="text-xs text-text_secondary uppercase tracking-widest mb-2">Scroll</span>
+            <svg class="w-6 h-6 text-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3">
+                </path>
+            </svg>
+        </div>
+    </section>
+
+    <!-- The Problem Section -->
+    <section id="problem" class="py-24 bg-navy_light relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-3xl md:text-5xl font-bold mb-6">A Global Silent Crisis</h2>
+                <p class="text-xl text-text_secondary max-w-3xl mx-auto">Traditional water testing is slow, manual, and
+                    reactive. By the time a pathogen is detected, an outbreak has already begun.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Stat 1 -->
+                <div class="glass-card p-8 rounded-2xl hover:bg-white/5 transition-all duration-300 transform hover:-translate-y-2 border-t border-t-white/10"
+                    data-aos="fade-up" data-aos-delay="100">
+                    <div class="w-14 h-14 rounded-full bg-accent/20 flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4">
+                            </path>
+                        </svg>
+                    </div>
+                    <div class="text-5xl font-extrabold text-white mb-2 counter" data-target="1.2">0</div>
+                    <div class="text-xl font-semibold text-text_primary mb-2">Crore Indians</div>
+                    <p class="text-text_secondary">Affected annually by preventable waterborne diseases.</p>
+                </div>
+
+                <!-- Stat 2 -->
+                <div class="glass-card p-8 rounded-2xl hover:bg-white/5 transition-all duration-300 transform hover:-translate-y-2 border-t border-t-white/10"
+                    data-aos="fade-up" data-aos-delay="200">
+                    <div class="w-14 h-14 rounded-full bg-teal/20 flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div class="text-5xl font-extrabold text-white mb-2"><span class="counter"
+                            data-target="73">0</span>%</div>
+                    <div class="text-xl font-semibold text-text_primary mb-2">Unreported Cases</div>
+                    <p class="text-text_secondary">In vulnerable areas, due to lack of immediate testing infrastructure.
+                    </p>
+                </div>
+
+                <!-- Stat 3 -->
+                <div class="glass-card p-8 rounded-2xl hover:bg-white/5 transition-all duration-300 transform hover:-translate-y-2 border-t border-t-white/10"
+                    data-aos="fade-up" data-aos-delay="300">
+                    <div class="w-14 h-14 rounded-full bg-yellow-500/20 flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div class="text-5xl font-extrabold text-white mb-2">&gt;<span class="counter"
+                            data-target="48">0</span>h</div>
+                    <div class="text-xl font-semibold text-text_primary mb-2">Detection Delay</div>
+                    <p class="text-text_secondary">Average time taken to confirm outbreaks (Cholera, Typhoid) via lab
+                        tests.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="py-24 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-20" data-aos="fade-up">
+                <h2 class="text-3xl md:text-5xl font-bold mb-6">From Detection to Prevention</h2>
+                <p class="text-xl text-text_secondary max-w-3xl mx-auto">Our end-to-end pipeline operates in real-time,
+                    leveraging edge computing and cloud AI.</p>
+            </div>
+
+            <div class="relative">
+                <!-- Connecting Line -->
+                <div
+                    class="hidden md:block absolute top-1/2 left-0 w-full h-1 bg-white/10 transform -translate-y-1/2 z-0">
+                </div>
+                <div
+                    class="hidden md:block absolute top-1/2 left-0 w-1/3 h-1 bg-gradient-to-r from-teal to-transparent transform -translate-y-1/2 z-0 animate-[pulse_3s_ease-in-out_infinite]">
+                </div>
+
+                <div class="grid md:grid-cols-4 gap-8 relative z-10">
+                    <!-- Step 1 -->
+                    <div class="bg-navy p-6 rounded-xl border border-white/10 flex flex-col items-center text-center relative"
+                        data-aos="fade-up" data-aos-delay="100">
+                        <div
+                            class="w-16 h-16 rounded-full bg-teal/10 border-2 border-teal flex items-center justify-center mb-4 z-10">
+                            <svg class="w-8 h-8 text-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0">
+                                </path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">IoT Sensors</h3>
+                        <p class="text-sm text-text_secondary">Solar-powered nodes monitor pH, turbidity, ORP, and
+                            temperature 24/7 in local water bodies.</p>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="bg-navy p-6 rounded-xl border border-white/10 flex flex-col items-center text-center relative"
+                        data-aos="fade-up" data-aos-delay="200">
+                        <div
+                            class="w-16 h-16 rounded-full bg-blue-500/10 border-2 border-blue-500 flex items-center justify-center mb-4 z-10">
+                            <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4">
+                                </path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">Data Ingestion</h3>
+                        <p class="text-sm text-text_secondary">Data is securely transmitted via LoRaWAN/MQTT to our
+                            cloud infrastructure.</p>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="bg-navy p-6 rounded-xl border border-white/10 flex flex-col items-center text-center relative"
+                        data-aos="fade-up" data-aos-delay="300">
+                        <div
+                            class="w-16 h-16 rounded-full bg-purple-500/10 border-2 border-purple-500 flex items-center justify-center mb-4 z-10">
+                            <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                                </path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">AI Model</h3>
+                        <p class="text-sm text-text_secondary">Deep learning models analyze temporal data to compute a
+                            Contamination Risk Score.</p>
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div class="bg-navy p-6 rounded-xl border border-white/10 flex flex-col items-center text-center relative"
+                        data-aos="fade-up" data-aos-delay="400">
+                        <div
+                            class="w-16 h-16 rounded-full bg-accent/10 border-2 border-accent flex items-center justify-center mb-4 z-10">
+                            <svg class="w-8 h-8 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z">
+                                </path>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">Actionable Alerts</h3>
+                        <p class="text-sm text-text_secondary">Geo-targeted SMS alerts and dashboard updates sent to
+                            local health authorities.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Dashboard Preview Section -->
+    <section id="dashboard" class="py-24 bg-navy_light relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-end mb-12" data-aos="fade-up">
+                <div>
+                    <h2 class="text-3xl md:text-5xl font-bold mb-4">Command Center</h2>
+                    <p class="text-xl text-text_secondary max-w-2xl">Real-time risk assessment map and sensor telemetry
+                        for vulnerable water bodies.</p>
+                </div>
+                <div class="mt-6 md:mt-0 flex gap-4">
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="w-3 h-3 rounded-full bg-teal"></span> Safe
+                    </div>
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="w-3 h-3 rounded-full bg-yellow-400"></span> Warning
+                    </div>
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="w-3 h-3 rounded-full bg-accent"></span> Critical
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Mockup UI -->
+            <div class="glass-card rounded-2xl border border-white/10 overflow-hidden shadow-2xl" data-aos="fade-up"
+                data-aos-delay="200">
+                <!-- Window Header -->
+                <div class="bg-navy/80 px-4 py-3 border-b border-white/5 flex items-center justify-between">
+                    <div class="flex space-x-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    </div>
+                    <div class="text-xs text-text_secondary font-mono tracking-widest">NEERMITRA // LIVE_TELEMETRY</div>
+                    <div class="text-xs font-mono text-teal flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-teal animate-pulse"></span> ONLINE
+                    </div>
+                </div>
+
+                <div class="grid lg:grid-cols-3 gap-0">
+                    <!-- Map Area (2/3 width) -->
+                    <div
+                        class="lg:col-span-2 relative bg-[#060c17] min-h-[500px] border-r border-white/5 flex items-center justify-center overflow-hidden">
+
+                        <!-- Leaflet Map Container -->
+                        <div id="map" class="w-full h-full absolute inset-0 z-10"></div>
+
+                        <!-- Map overlay UI -->
+                        <div class="absolute top-4 left-4 z-[400] flex flex-col gap-2">
+                            <button id="locateBtn"
+                                class="px-4 py-2 rounded-lg bg-teal text-navy font-bold hover:bg-white transition-colors shadow-lg flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z">
+                                    </path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                                Find My Risk Area
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Charts Area (1/3 width) -->
+                    <div class="p-6 bg-navy/50 flex flex-col gap-6">
+                        <div class="mb-2">
+                            <h3 class="text-lg font-bold mb-1">Aggregate Risk Score</h3>
+                            <div class="text-4xl font-extrabold text-accent"><span
+                                    id="aggregateRiskScore">--</span><span
+                                    class="text-lg text-text_secondary font-normal">/100</span></div>
+                        </div>
+
+                        <!-- Chart 1 -->
+                        <div class="bg-navy_light p-4 rounded-xl border border-white/5">
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="text-xs font-semibold text-text_secondary uppercase">Turbidity Trend (NTU)
+                                </h4>
+                            </div>
+                            <div class="h-32">
+                                <canvas id="turbidityChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Chart 2 -->
+                        <div class="bg-navy_light p-4 rounded-xl border border-white/5">
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="text-xs font-semibold text-text_secondary uppercase">pH Level Variance</h4>
+                            </div>
+                            <div class="h-32">
+                                <canvas id="phChart"></canvas>
+                            </div>
+                        </div>
+
+                        <button id="generateReportBtn"
+                            class="w-full py-3 rounded-lg bg-accent/10 border border-accent/50 text-accent font-bold hover:bg-accent hover:text-white transition-colors">
+                            Generate Alert Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Impact Metrics Section -->
+    <section id="impact" class="py-24 relative z-10 border-t border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16" data-aos="fade-up">
+                <h2 class="text-3xl font-bold mb-4">Current Deployment Impact</h2>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+                <div class="glass-card p-6 rounded-2xl text-center" data-aos="zoom-in" data-aos-delay="0">
+                    <div class="text-4xl font-extrabold text-gradient mb-2 counter" data-target="48">0</div>
+                    <div class="text-sm text-text_secondary uppercase tracking-wider font-semibold">Districts Covered
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl text-center" data-aos="zoom-in" data-aos-delay="100">
+                    <div class="text-4xl font-extrabold text-gradient mb-2"><span class="counter"
+                            data-target="320">0</span>+</div>
+                    <div class="text-sm text-text_secondary uppercase tracking-wider font-semibold">Sensors Deployed
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl text-center" data-aos="zoom-in" data-aos-delay="200">
+                    <div class="text-4xl font-extrabold text-gradient mb-2 counter" data-target="12">0</div>
+                    <div class="text-sm text-text_secondary uppercase tracking-wider font-semibold">Outbreaks Prevented
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl text-center" data-aos="zoom-in" data-aos-delay="300">
+                    <div class="text-4xl font-extrabold text-gradient mb-2"><span class="counter"
+                            data-target="68">0</span>%</div>
+                    <div class="text-sm text-text_secondary uppercase tracking-wider font-semibold">Faster Response
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack Section -->
+    <section class="py-20 bg-navy_light relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h3 class="text-center text-sm font-semibold text-text_secondary tracking-widest uppercase mb-10">Powered By
+                Industry Standard Technology</h3>
+            <div
+                class="flex flex-wrap justify-center gap-8 md:gap-16 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
+                <!-- Tech Icons (Text replacements for visual layout) -->
+                <div class="text-xl font-bold font-mono text-white">Python</div>
+                <div class="text-xl font-bold font-mono text-white">TensorFlow</div>
+                <div class="text-xl font-bold font-mono text-white">React</div>
+                <div class="text-xl font-bold font-mono text-white">Node.js</div>
+                <div class="text-xl font-bold font-mono text-white">MQTT</div>
+                <div class="text-xl font-bold font-mono text-white">PostgreSQL</div>
+                <div class="text-xl font-bold font-mono text-white">AWS</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-[#020611] py-12 border-t border-white/10 relative z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid md:grid-cols-3 gap-8 items-center">
+                <div>
+                    <div class="flex items-center gap-2 mb-4">
+                        <svg class="w-6 h-6 text-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        <span class="font-bold text-xl">Neer<span class="text-teal">Mitra</span></span>
+                    </div>
+                    <p class="text-sm text-text_secondary">Ministry of Development of North Eastern Region</p>
+                </div>
+
+                <div class="flex justify-center">
+                    <div class="px-4 py-2 border border-white/20 rounded-lg inline-block text-center">
+                        <div class="text-xs font-bold text-white tracking-widest">SMART INDIA HACKATHON 2025</div>
+                        <div class="text-xs text-teal font-mono mt-1">ID: SIH25001</div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-4">
+                    <a href="#" class="text-text_secondary hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path fill-rule="evenodd"
+                                d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    <a href="mailto:contact@neermitra.tech"
+                        class="text-text_secondary hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                            </path>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+            <div class="mt-8 text-center text-sm text-text_secondary border-t border-white/5 pt-8">
+                &copy; 2025 NeerMitra Team. Designed for SIH 2025.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize AOS
+        AOS.init({
+            once: true,
+            offset: 50,
+            duration: 800,
+        });
+
+        // Navbar blur effect on scroll
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                nav.classList.add('bg-navy/80', 'backdrop-blur-md', 'shadow-lg');
+                nav.classList.remove('border-b-0');
+            } else {
+                nav.classList.remove('bg-navy/80', 'backdrop-blur-md', 'shadow-lg');
+                nav.classList.add('border-b-0');
+            }
+        });
+
+        // Number Counter Animation
+        const counters = document.querySelectorAll('.counter');
+        const speed = 200;
+
+        const animateCounters = () => {
+            counters.forEach(counter => {
+                const updateCount = () => {
+                    const target = +counter.getAttribute('data-target');
+                    const count = +counter.innerText;
+                    const inc = target / speed;
+
+                    if (count < target) {
+                        counter.innerText = (count + inc).toFixed(target % 1 !== 0 ? 1 : 0);
+                        setTimeout(updateCount, 1);
+                    } else {
+                        counter.innerText = target;
+                    }
+                };
+
+                // Simple intersection observer for counters
+                const observer = new IntersectionObserver((entries) => {
+                    if (entries[0].isIntersecting) {
+                        updateCount();
+                        observer.disconnect();
+                    }
+                });
+                observer.observe(counter);
+            });
+        };
+        animateCounters();
+
+        // Chart.js Configuration
+        Chart.defaults.color = '#9CA3AF';
+        Chart.defaults.font.family = "'Outfit', sans-serif";
+
+        // Turbidity Chart
+        const ctxTurbidity = document.getElementById('turbidityChart').getContext('2d');
+        let turbidityChart = new Chart(ctxTurbidity, {
+            type: 'line',
+            data: {
+                labels: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
+                datasets: [{
+                    label: 'Turbidity (NTU)',
+                    data: [12, 19, 15, 25, 42, 38, 45], // Spiking data
+                    borderColor: '#FF3366',
+                    backgroundColor: 'rgba(255, 51, 102, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#FF3366',
+                    pointRadius: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false, drawBorder: false } },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // pH Chart
+        const ctxPh = document.getElementById('phChart').getContext('2d');
+        let phChart = new Chart(ctxPh, {
+            type: 'bar',
+            data: {
+                labels: ['Node 1', 'Node 2', 'Node 3', 'Node 4', 'Node 5'],
+                datasets: [{
+                    label: 'pH Level',
+                    data: [7.2, 6.8, 7.5, 5.2, 7.1], // Node 4 is low (acidic/anomaly)
+                    backgroundColor: [
+                        '#00F0FF', '#00F0FF', '#00F0FF', '#FF3366', '#00F0FF'
+                    ],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false, drawBorder: false } },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false },
+                        min: 4,
+                        max: 9
+                    }
+                }
+            }
+        });
+
+        // --- LEAFLET MAP INITIALIZATION ---
+        // Initialize map centered on India
+        const map = L.map('map').setView([20.5937, 78.9629], 5);
+
+        // Add CartoDB Dark Matter tiles for the aesthetic
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        // Add some mock high-risk markers across India
+        const mockRisks = [
+            { lat: 26.1445, lng: 91.7362, name: "Guwahati Node", risk: "CRITICAL", color: "#FF3366" },
+            { lat: 25.5941, lng: 85.1376, name: "Patna Node", risk: "WARNING", color: "#FBBF24" },
+            { lat: 22.5726, lng: 88.3639, name: "Kolkata Node", risk: "CRITICAL", color: "#FF3366" },
+            { lat: 13.0827, lng: 80.2707, name: "Chennai Node", risk: "WARNING", color: "#FBBF24" },
+            { lat: 19.0760, lng: 72.8777, name: "Mumbai Node", risk: "SAFE", color: "#00F0FF" },
+            { lat: 28.6139, lng: 77.2090, name: "Delhi Node", risk: "WARNING", color: "#FBBF24" }
+        ];
+
+        mockRisks.forEach(point => {
+            const circle = L.circleMarker([point.lat, point.lng], {
+                radius: 8,
+                fillColor: point.color,
+                color: point.color,
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+            circle.bindPopup(`<b>${point.name}</b><br>Status: <span style="color:${point.color}">${point.risk}</span>`);
+        });
+
+        // User location marker
+        let userMarker = null;
+        let userLat = null;
+        let userLng = null;
+
+        document.getElementById('locateBtn').addEventListener('click', () => {
+            if (navigator.geolocation) {
+                document.getElementById('locateBtn').innerText = "Locating...";
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userLat = position.coords.latitude;
+                        userLng = position.coords.longitude;
+
+                        map.setView([userLat, userLng], 10);
+
+                        if (userMarker) {
+                            map.removeLayer(userMarker);
+                        }
+
+                        userMarker = L.circleMarker([userLat, userLng], {
+                            radius: 12,
+                            fillColor: "#00F0FF",
+                            color: "#ffffff",
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.9
+                        }).addTo(map);
+                        userMarker.bindPopup("<b>Your Location</b>").openPopup();
+
+                        document.getElementById('locateBtn').innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Location Found`;
+
+                        // Fetch new data for this location immediately
+                        fetchData();
+                    },
+                    (error) => {
+                        alert("Unable to retrieve your location. Please ensure location permissions are granted.");
+                        document.getElementById('locateBtn').innerText = "Find My Risk Area";
+                    }
+                );
+            } else {
+                alert("Geolocation is not supported by your browser");
+            }
+        });
+
+        // Data Fetching Logic
+        const fetchData = async () => {
+            try {
+                // Fetch Telemetry Data
+                const telemetryRes = await fetch('/api/telemetry');
+                const telemetryData = await telemetryRes.json();
+
+                turbidityChart.data.labels = telemetryData.turbidity.labels;
+                turbidityChart.data.datasets[0].data = telemetryData.turbidity.data;
+                turbidityChart.update();
+
+                phChart.data.labels = telemetryData.ph.labels;
+                phChart.data.datasets[0].data = telemetryData.ph.data;
+                phChart.data.datasets[0].backgroundColor = telemetryData.ph.data.map(val => val < 6 || val > 8.5 ? '#FF3366' : '#00F0FF');
+                phChart.update();
+
+                // Fetch Risk Score Data (include lat/lng if we have it)
+                let riskUrl = '/api/risk-score';
+                if (userLat && userLng) {
+                    riskUrl += `?lat=${userLat}&lng=${userLng}`;
+                }
+                const riskRes = await fetch(riskUrl);
+                const riskData = await riskRes.json();
+
+                document.getElementById('aggregateRiskScore').innerText = riskData.score;
+
+                // Update color based on status
+                const scoreElement = document.getElementById('aggregateRiskScore');
+                if (riskData.status === 'CRITICAL') {
+                    scoreElement.parentElement.className = "text-4xl font-extrabold text-accent";
+                } else if (riskData.status === 'WARNING') {
+                    scoreElement.parentElement.className = "text-4xl font-extrabold text-yellow-500";
+                } else {
+                    scoreElement.parentElement.className = "text-4xl font-extrabold text-teal";
+                }
+
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        };
+
+        // Generate Report Button Logic
+        document.getElementById('generateReportBtn').addEventListener('click', () => {
+            const btn = document.getElementById('generateReportBtn');
+            const originalText = btn.innerText;
+            btn.innerText = "Generating Report...";
+
+            // Simulate network/generation delay
+            setTimeout(() => {
+                const score = document.getElementById('aggregateRiskScore').innerText;
+                alert(`Alert Report Generated!\n\nCurrent Aggregate Risk Score: ${score}\n\nThis mock report has been "dispatched" to local health authorities.`);
+                btn.innerText = originalText;
+            }, 1500);
+        });
+
+        // Fetch immediately and then poll every 5 seconds
+        fetchData();
+        setInterval(fetchData, 5000);
+    </script>
+</body>
+
+</html>
