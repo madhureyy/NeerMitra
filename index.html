@@ -74,6 +74,15 @@
             -webkit-text-fill-color: transparent;
         }
 
+        /* Dark mode filter for standard OpenStreetMap tiles - 100% Free, No API Key required */
+        .dark-mode-map .leaflet-tile-pane {
+            filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+        }
+        .dark-mode-map .leaflet-marker-pane,
+        .dark-mode-map .leaflet-popup-pane {
+            filter: none;
+        }
+
         .glow {
             box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
         }
@@ -439,7 +448,7 @@
                         class="lg:col-span-2 relative bg-[#060c17] min-h-[500px] border-r border-white/5 flex items-center justify-center overflow-hidden">
 
                         <!-- Leaflet Map Container -->
-                        <div id="map" class="w-full h-full absolute inset-0 z-10"></div>
+                        <div id="map" class="w-full h-full absolute inset-0 z-10 dark-mode-map"></div>
 
                         <!-- Map overlay UI -->
                         <div class="absolute top-4 left-4 z-[400] flex flex-col gap-2">
@@ -721,11 +730,10 @@
         // Initialize map centered on India
         const map = L.map('map').setView([20.5937, 78.9629], 5);
 
-        // Add CartoDB Dark Matter tiles for the aesthetic
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 20
+        // Standard OpenStreetMap tiles (100% free, no API key required, styled with CSS dark filter)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
         }).addTo(map);
 
         // Load live monitoring nodes from NeerMitra Backend
