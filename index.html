@@ -750,6 +750,7 @@
         const loadNodesOnMap = async () => {
             try {
                 const res = await fetch('/api/nodes');
+                if (!res.ok) throw new Error('Backend API not reachable');
                 const data = await res.json();
                 const nodes = data.nodes || [];
 
@@ -851,11 +852,13 @@
             }
         });
 
-        // Data Fetching Logic
+        // Data Fetching Logic (with automatic static simulation fallback for GitHub Pages)
+        let fallbackTurbidity = [12, 19, 15, 25, 42, 38, 45];
         const fetchData = async () => {
             try {
                 // Fetch Telemetry Data
                 const telemetryRes = await fetch('/api/telemetry');
+                if (!telemetryRes.ok) throw new Error('Static/offline mode');
                 const telemetryData = await telemetryRes.json();
 
                 turbidityChart.data.labels = telemetryData.turbidity.labels;
@@ -873,6 +876,7 @@
                     riskUrl += `?lat=${userLat}&lng=${userLng}`;
                 }
                 const riskRes = await fetch(riskUrl);
+                if (!riskRes.ok) throw new Error('Static/offline mode');
                 const riskData = await riskRes.json();
 
                 document.getElementById('aggregateRiskScore').innerText = riskData.score;
@@ -888,7 +892,26 @@
                 }
 
             } catch (error) {
-                console.error("Error fetching data:", error);
+                // Client-side fallback for GitHub Pages (no Node backend running)
+                const lastVal = fallbackTurbidity[fallbackTurbidity.length - 1];
+                const change = (Math.random() - 0.5) * 6;
+                fallbackTurbidity.shift();
+                fallbackTurbidity.push(Math.max(5, Math.min(95, Number((lastVal + change).toFixed(1)))));
+
+                turbidityChart.data.labels = ['t-6', 't-5', 't-4', 't-3', 't-2', 't-1', 'Now'];
+                turbidityChart.data.datasets[0].data = fallbackTurbidity;
+                turbidityChart.update();
+
+                const mockPh = [7.4, 7.1, 8.8, 6.7, 7.2, 8.5];
+                phChart.data.labels = ['Guwahati', 'Patna', 'Kolkata', 'Chennai', 'Mumbai', 'Delhi'];
+                phChart.data.datasets[0].data = mockPh;
+                phChart.data.datasets[0].backgroundColor = mockPh.map(val => val < 6.5 || val > 8.5 ? '#FF3366' : '#00F0FF');
+                phChart.update();
+
+                const staticScore = 54;
+                const scoreElement = document.getElementById('aggregateRiskScore');
+                scoreElement.innerText = staticScore;
+                scoreElement.parentElement.className = "text-4xl font-extrabold text-yellow-500";
             }
         };
 
