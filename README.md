@@ -126,3 +126,4 @@ Flash using the Arduino IDE with `ESP32 Dev Module` selected and update the WiFi
 
 ## 📄 License
 MIT License. Developed for water safety and community health monitoring.
+
