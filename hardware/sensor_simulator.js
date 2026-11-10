@@ -70,3 +70,4 @@ setInterval(() => {
     sendReading(station);
     index = (index + 1) % stations.length;
 }, 4000);
+
