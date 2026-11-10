@@ -1,11 +1,12 @@
 {
-  "name": "aquaguard-backend",
+  "name": "neermitra-backend",
   "version": "1.0.0",
-  "description": "Backend for AquaGuard Dashboard",
+  "description": "Backend & IoT Ingestion for NeerMitra Water-Borne Disease Early Warning System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "simulate:iot": "node hardware/sensor_simulator.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

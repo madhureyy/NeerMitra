@@ -728,27 +728,67 @@
             maxZoom: 20
         }).addTo(map);
 
-        // Add some mock high-risk markers across India
-        const mockRisks = [
-            { lat: 26.1445, lng: 91.7362, name: "Guwahati Node", risk: "CRITICAL", color: "#FF3366" },
-            { lat: 25.5941, lng: 85.1376, name: "Patna Node", risk: "WARNING", color: "#FBBF24" },
-            { lat: 22.5726, lng: 88.3639, name: "Kolkata Node", risk: "CRITICAL", color: "#FF3366" },
-            { lat: 13.0827, lng: 80.2707, name: "Chennai Node", risk: "WARNING", color: "#FBBF24" },
-            { lat: 19.0760, lng: 72.8777, name: "Mumbai Node", risk: "SAFE", color: "#00F0FF" },
-            { lat: 28.6139, lng: 77.2090, name: "Delhi Node", risk: "WARNING", color: "#FBBF24" }
-        ];
+        // Load live monitoring nodes from NeerMitra Backend
+        let mapMarkers = [];
+        const loadNodesOnMap = async () => {
+            try {
+                const res = await fetch('/api/nodes');
+                const data = await res.json();
+                const nodes = data.nodes || [];
 
-        mockRisks.forEach(point => {
-            const circle = L.circleMarker([point.lat, point.lng], {
-                radius: 8,
-                fillColor: point.color,
-                color: point.color,
-                weight: 1,
-                opacity: 1,
-                fillOpacity: 0.8
-            }).addTo(map);
-            circle.bindPopup(`<b>${point.name}</b><br>Status: <span style="color:${point.color}">${point.risk}</span>`);
-        });
+                // Clear prior markers
+                mapMarkers.forEach(m => map.removeLayer(m));
+                mapMarkers = [];
+
+                nodes.forEach(point => {
+                    const circle = L.circleMarker([point.lat, point.lng], {
+                        radius: 9,
+                        fillColor: point.color,
+                        color: '#ffffff',
+                        weight: 1.5,
+                        opacity: 1,
+                        fillOpacity: 0.85
+                    }).addTo(map);
+
+                    const popupContent = `
+                        <div class="p-1 text-slate-800">
+                            <b class="text-sm">${point.name}</b><br>
+                            <span class="text-xs text-slate-600">${point.water_body || 'Surface Water'}</span><br>
+                            <hr class="my-1 border-slate-300">
+                            <b>Status:</b> <span style="color:${point.color}; font-weight: bold;">${point.risk}</span> (Risk: ${point.riskScore}/100)<br>
+                            <b>Turbidity:</b> ${point.telemetry.turbidity} NTU<br>
+                            <b>pH:</b> ${point.telemetry.ph}<br>
+                            <span class="text-xs text-red-600 font-semibold">${point.diseaseRisk || ''}</span>
+                        </div>
+                    `;
+                    circle.bindPopup(popupContent);
+                    mapMarkers.push(circle);
+                });
+            } catch (err) {
+                console.warn('Using fallback map markers:', err);
+                const fallbackRisks = [
+                    { lat: 26.1445, lng: 91.7362, name: "Guwahati Node", risk: "CRITICAL", color: "#FF3366" },
+                    { lat: 25.5941, lng: 85.1376, name: "Patna Node", risk: "WARNING", color: "#FBBF24" },
+                    { lat: 22.5726, lng: 88.3639, name: "Kolkata Node", risk: "CRITICAL", color: "#FF3366" },
+                    { lat: 13.0827, lng: 80.2707, name: "Chennai Node", risk: "WARNING", color: "#FBBF24" },
+                    { lat: 19.0760, lng: 72.8777, name: "Mumbai Node", risk: "SAFE", color: "#00F0FF" },
+                    { lat: 28.6139, lng: 77.2090, name: "Delhi Node", risk: "WARNING", color: "#FBBF24" }
+                ];
+                fallbackRisks.forEach(point => {
+                    const circle = L.circleMarker([point.lat, point.lng], {
+                        radius: 8,
+                        fillColor: point.color,
+                        color: point.color,
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    }).addTo(map);
+                    circle.bindPopup(`<b>${point.name}</b><br>Status: <span style="color:${point.color}">${point.risk}</span>`);
+                });
+            }
+        };
+
+        loadNodesOnMap();
 
         // User location marker
         let userMarker = null;
